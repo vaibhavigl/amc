@@ -9,7 +9,9 @@ import {
   Calendar,
   Building,
   User,
-  AlertTriangle
+  AlertTriangle,
+  Grid3X3,
+  List
 } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../../contexts/AuthContext';
@@ -42,6 +44,7 @@ const ContractList: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
+  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
 
   useEffect(() => {
     fetchContracts();
@@ -101,6 +104,37 @@ const ContractList: React.FC = () => {
     return matchesSearch;
   });
 
+  const renderStatusBadge = (contract: Contract) => {
+    if (isExpired(contract.amcEnd)) {
+      return (
+        <span className="px-2 py-1 bg-red-100 text-red-800 text-xs font-medium rounded-full">
+          Expired
+        </span>
+      );
+    }
+    if (isExpiringSoon(contract.amcEnd)) {
+      return (
+        <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full">
+          Expiring Soon
+        </span>
+      );
+    }
+    return (
+      <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+        Active
+      </span>
+    );
+  };
+
+  const renderTypeBadge = (amcType: string) => (
+    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+      amcType === 'Comprehensive' 
+        ? 'bg-blue-100 text-blue-800' 
+        : 'bg-green-100 text-green-800'
+    }`}>
+      {amcType}
+    </span>
+  );
   if (loading) {
     return <LoadingSpinner />;
   }
@@ -152,6 +186,30 @@ const ContractList: React.FC = () => {
                 <option value="non-comprehensive">Non-comprehensive</option>
               </select>
             </div>
+            <div className="flex items-center bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('card')}
+                className={`flex items-center space-x-1 px-3 py-1 rounded-md text-sm font-medium transition-colors duration-200 ${
+                  viewMode === 'card'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Grid3X3 className="w-4 h-4" />
+                <span>Cards</span>
+              </button>
+              <button
+                onClick={() => setViewMode('table')}
+                className={`flex items-center space-x-1 px-3 py-1 rounded-md text-sm font-medium transition-colors duration-200 ${
+                  viewMode === 'table'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <List className="w-4 h-4" />
+                <span>Table</span>
+              </button>
+            </div>
             <div className="text-sm text-gray-600">
               {filteredContracts.length} of {contracts.length} contracts
             </div>
@@ -159,7 +217,7 @@ const ContractList: React.FC = () => {
         </div>
       </div>
 
-      {/* Contracts Grid */}
+      {/* Contracts Display */}
       {filteredContracts.length === 0 ? (
         <div className="text-center py-12">
           <Building className="w-16 h-16 text-gray-300 mx-auto mb-4" />
@@ -180,7 +238,8 @@ const ContractList: React.FC = () => {
             </Link>
           )}
         </div>
-      ) : (
+      ) : viewMode === 'card' ? (
+        {/* Card View */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredContracts.map((contract) => (
             <div
@@ -196,23 +255,8 @@ const ContractList: React.FC = () => {
                     <p className="text-gray-600">{contract.make} {contract.model}</p>
                   </div>
                   <div className="flex items-center space-x-2">
-                    {isExpired(contract.amcEnd) && (
-                      <span className="px-2 py-1 bg-red-100 text-red-800 text-xs font-medium rounded-full">
-                        Expired
-                      </span>
-                    )}
-                    {isExpiringSoon(contract.amcEnd) && !isExpired(contract.amcEnd) && (
-                      <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full">
-                        Expiring Soon
-                      </span>
-                    )}
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      contract.amcType === 'Comprehensive' 
-                        ? 'bg-blue-100 text-blue-800' 
-                        : 'bg-green-100 text-green-800'
-                    }`}>
-                      {contract.amcType}
-                    </span>
+                    {renderStatusBadge(contract)}
+                    {renderTypeBadge(contract.amcType)}
                   </div>
                 </div>
 
@@ -270,6 +314,110 @@ const ContractList: React.FC = () => {
               </div>
             </div>
           ))}
+        </div>
+      ) : (
+        {/* Table View */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Asset Details
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    AMC Period
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Location & Vendor
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  {user?.role === 'MANAGER' && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Owner
+                    </th>
+                  )}
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredContracts.map((contract) => (
+                  <tr key={contract.id} className="hover:bg-gray-50 transition-colors duration-200">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">
+                          {contract.assetNumber}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {contract.make} {contract.model}
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          S/N: {contract.serialNumber}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {new Date(contract.amcStart).toLocaleDateString()}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        to {new Date(contract.amcEnd).toLocaleDateString()}
+                      </div>
+                      {isExpiringSoon(contract.amcEnd) && !isExpired(contract.amcEnd) && (
+                        <div className="text-xs text-yellow-600 font-medium">
+                          Expires in {Math.ceil((new Date(contract.amcEnd).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-900 max-w-xs truncate">
+                        {contract.location}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {contract.vendor}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex flex-col space-y-1">
+                        {renderStatusBadge(contract)}
+                        {renderTypeBadge(contract.amcType)}
+                      </div>
+                    </td>
+                    {user?.role === 'MANAGER' && (
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {contract.owner.name}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {contract.owner.email}
+                        </div>
+                      </td>
+                    )}
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex items-center justify-end space-x-2">
+                        <Link
+                          to={`/contracts/${contract.id}/edit`}
+                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors duration-200"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Link>
+                        <button
+                          onClick={() => handleDelete(contract.id)}
+                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-200"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
